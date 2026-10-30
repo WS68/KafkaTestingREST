@@ -1,0 +1,22 @@
+# Зависимости
+node_modules/
+
+# Сборка
+dist/
+*.tsbuildinfo
+
+# Покрытие тестов
+coverage/
+
+# Журналы и временные файлы
+*.log
+npm-debug.log*
+.env
+.env.*
+!.env.example
+
+# Служебные файлы редакторов и ОС
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
