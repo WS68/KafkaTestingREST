@@ -30,32 +30,35 @@ POST /api/v1/topics/{name}/records?ack=0/1
 
 Формат сообщения `RecordDto`:
 
-``` json
+```json
 {
   "headers": [
-        {
-            "name": "Header-1",
-            "value": "SGVhZGVyLTE="
-        },
-        {
-            "name": "Header-2",
-            "value": "SGVhZGVyLTI="
-        }
-    ],
-    "key": {
-        "type": "BINARY",
-        "data": "Zm9vYmFy"
+    {
+      "name": "Header-1",
+      "value": "Header-1"
     },
-    "value": {
-        "type": "JSON",
-        "data": {
-            "foo": "bar"
-        }
+    {
+      "name": "Header-2",
+      "type": "BINARY",
+      "value": "SGVhZGVyLTI="
     }
+  ],
+  "key": {
+    "type": "STRING",
+    "data": "foobar"
+  },
+  "value": {
+    "type": "JSON",
+    "data": {
+      "foo": "bar"
+    }
+  }
 }
 ```
 
 Возврат: 201 + {} — если отправка подтверждена; 202 + {} — если сообщение принято к отправке; 400 — если топик недопустим.
+
+Типы `STRING`, `BINARY`, `JSON`, значения по умолчанию, преобразование в исходные байты и представление полученной записи описаны в [`docs/api.md`](docs/api.md).
 
 ### Проверка/чтение записей
 
@@ -67,34 +70,36 @@ POST /api/v1/topics/{name}/records?ack=0/1
 
 Тело запроса:
 
-``` json
+```json
 {
-   "topic": string,
-   "autoDeleteSeconds": int,
-   "checks" : [      
-		{
-			"headers" : [
-				{
-					"name": string 
-                    "value": string   				
-				},
-			],	
-			"values" : [
-				{
-					"jsonPath" : string
-					"value": string
-				}
-			]				
-		}
-   ] 
+  "topic": "orders.results",
+  "autoDeleteSeconds": 300,
+  "checks": [
+    {
+      "headers": [
+        {
+          "name": "correlationId",
+          "value": "corr-123"
+        }
+      ],
+      "values": [
+        {
+          "jsonPath": "$.status",
+          "value": "COMPLETED"
+        }
+      ]
+    }
+  ]
 }
 ```
 
+Значение ожидаемого заголовка — обычная UTF-8-строка, а не base64. Полное описание полей и правил сопоставления приведено в [`docs/api.md`](docs/api.md).
+
 Возврат
 
-``` json
+```json
 {
-	"id": string
+  "id": "3f6b1a2c-9d4e-4b7a-8c1a-2e5f7a9b0c3d"
 }
 ```
 
@@ -111,13 +116,13 @@ POST /api/v1/topics/{name}/records?ack=0/1
 #### GET /api/v1/slots/{id}/checks/{index}/count
 
 Число записей, попавших под проверку.
-Ответ 200 `{ "count": int }`.
+Ответ 200 `{ "count": 2 }`.
 
 #### GET /api/v1/slots/{id}/checks/{index}?offset=N&count=M
 
 Чтение записей, попавших под проверку.
 
-Возврат 200 + RecordDto[].
+Возврат 200 + массив записей в представлении полученной записи: заголовки — UTF-8-строки, ключ — base64 исходных байтов, значение — JSON. Двоичное тело ответа не поддерживается. Формат описан в [`docs/api.md`](docs/api.md).
 
 M — по умолчанию 20.
 
@@ -139,7 +144,9 @@ M — по умолчанию 20.
 
 ### Дополнительные интерфейсы
 
-/api-docs и /api-docs/swagger-ui — спецификация OpenAPI и пользовательский интерфейс Swagger UI.
+/api-docs и /api-docs/swagger-ui — собственная спецификация OpenAPI сервиса и пользовательский интерфейс Swagger UI.
+
+Файл [`misc/openapi.yaml`](misc/openapi.yaml) — внешняя спецификация Confluent Kafka REST v3, описывающая REST-прокси Kafka. Это не спецификация этого сервиса: она используется только как описание формата вызова REST-прокси и не содержит слотов и значений по умолчанию сервиса.
 
 ## Тесты
 
