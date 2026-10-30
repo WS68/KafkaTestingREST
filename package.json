@@ -11,6 +11,8 @@
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "node scripts/run-vitest.mjs run",
+    "test:integration": "node scripts/run-vitest.mjs run --config vitest.integration.config.ts",
     "format": "prettier --write --no-error-on-unmatched-pattern \"src/**/*.ts\" \"tests/**/*.ts\"",
     "format:check": "prettier --check --no-error-on-unmatched-pattern \"src/**/*.ts\" \"tests/**/*.ts\"",
     "start": "node dist/main.js"
@@ -22,6 +24,7 @@
   "devDependencies": {
     "@types/node": "22.20.5",
     "prettier": "3.9.10",
-    "typescript": "5.9.3"
+    "typescript": "5.9.3",
+    "vitest": "4.1.12"
   }
 }
