@@ -1,0 +1,12 @@
+export { publishRoute } from './publish.js';
+export type { PublishRouteDependencies } from './publish.js';
+export { slotsCountRoute } from './slots-count.js';
+export type { SlotsCountRouteDependencies } from './slots-count.js';
+export { slotsDeleteRoute } from './slots-delete.js';
+export type { SlotsDeleteRouteDependencies } from './slots-delete.js';
+export { slotsReadRoute } from './slots-read.js';
+export type { SlotsReadRouteDependencies } from './slots-read.js';
+export { slotsRegisterRoute } from './slots-register.js';
+export type { SlotsRegisterRouteDependencies } from './slots-register.js';
+export { slotsWaitRoute } from './slots-wait.js';
+export type { SlotsWaitRouteDependencies } from './slots-wait.js';

@@ -33,6 +33,11 @@ export type WaitSettledCallback = (
 ) => void;
 
 export interface WaitRegistry {
+  /** Регистрирует ожидание и возвращает его идентификатор вместе с результатом. */
+  registerWithHandle(
+    request: WaitRequest,
+    checkCount: () => number,
+  ): { readonly waitId: string; readonly result: Promise<WaitOutcome> };
   /**
    * Регистрирует ожидание; при уже выполненном условии — разрешается немедленно.
    * При локальной отмене обещание отклоняется с `WaitCancelledError`; вызывающая
@@ -101,7 +106,10 @@ export function createWaitRegistry(options: {
     }
   };
 
-  const register = (request: WaitRequest, checkCount: () => number): Promise<WaitOutcome> => {
+  const registerWithHandle = (
+    request: WaitRequest,
+    checkCount: () => number,
+  ): { readonly waitId: string; readonly result: Promise<WaitOutcome> } => {
     let resolve!: (outcome: WaitOutcome) => void;
     let reject!: (error: WaitCancelledError) => void;
     const promise = new Promise<WaitOutcome>((resolvePromise, rejectPromise) => {
@@ -119,7 +127,7 @@ export function createWaitRegistry(options: {
     // Проверка и добавление выполняются синхронно: между ними нет await.
     if (checkCount() >= request.requiredCount) {
       settle([wait], 'condition');
-      return promise;
+      return { waitId: handle.id, result: promise };
     }
 
     pendingWaits.set(handle.id, wait);
@@ -129,8 +137,11 @@ export function createWaitRegistry(options: {
     } else {
       handle.cancelTimeout = () => timeoutTask.cancel();
     }
-    return promise;
+    return { waitId: handle.id, result: promise };
   };
+
+  const register = (request: WaitRequest, checkCount: () => number): Promise<WaitOutcome> =>
+    registerWithHandle(request, checkCount).result;
 
   const notifyAccumulated = (slotId: SlotId, checkIndex: number): void => {
     const completed: PendingWait[] = [];
@@ -178,6 +189,7 @@ export function createWaitRegistry(options: {
 
   return {
     register,
+    registerWithHandle,
     notifyAccumulated,
     settleSlot,
     settleAll,

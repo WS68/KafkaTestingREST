@@ -7,6 +7,11 @@ import type { CountResult } from '../results/slot.js';
 import type { ReadResult } from '../results/reading.js';
 import type { WaitResult } from '../results/waiting.js';
 
+export interface SlotWaitHandle {
+  readonly waitId: string | undefined;
+  readonly result: Promise<WaitResult>;
+}
+
 export interface SlotQueryService {
   count(slotId: SlotId, checkIndex: number): Promise<CountResult>;
   read(slotId: SlotId, checkIndex: number, offset: number, limit: number): Promise<ReadResult>;
@@ -15,6 +20,11 @@ export interface SlotQueryService {
     checkIndex: number,
     request: { readonly n: number; readonly timeoutMs: number },
   ): Promise<WaitResult>;
+  waitWithHandle(
+    slotId: SlotId,
+    checkIndex: number,
+    request: { readonly n: number; readonly timeoutMs: number },
+  ): SlotWaitHandle;
 }
 
 /**
@@ -62,31 +72,51 @@ export function createSlotQueryService(deps: {
     return { kind: 'records', records };
   };
 
-  const wait = async (
+  const waitWithHandle = (
     slotId: SlotId,
     checkIndex: number,
     request: { readonly n: number; readonly timeoutMs: number },
-  ): Promise<WaitResult> => {
-    if (!isValidCheckIndex(checkIndex)) return { kind: 'invalid-request' };
-    if (request.n < 1 || request.timeoutMs <= 0) return { kind: 'invalid-request' };
+  ): SlotWaitHandle => {
+    if (!isValidCheckIndex(checkIndex)) {
+      return { waitId: undefined, result: Promise.resolve({ kind: 'invalid-request' }) };
+    }
+    if (request.n < 1 || request.timeoutMs <= 0) {
+      return { waitId: undefined, result: Promise.resolve({ kind: 'invalid-request' }) };
+    }
 
     const registered = deps.registry.get(slotId);
-    if (registered === undefined) return { kind: 'slot-not-found' };
-    if (checkIndex >= registered.accumulators.length) return { kind: 'check-not-found' };
+    if (registered === undefined) {
+      return { waitId: undefined, result: Promise.resolve({ kind: 'slot-not-found' }) };
+    }
+    if (checkIndex >= registered.accumulators.length) {
+      return { waitId: undefined, result: Promise.resolve({ kind: 'check-not-found' }) };
+    }
 
     const accumulator = registered.accumulators[checkIndex];
-    if (accumulator === undefined) return { kind: 'check-not-found' };
+    if (accumulator === undefined) {
+      return { waitId: undefined, result: Promise.resolve({ kind: 'check-not-found' }) };
+    }
+
     const waitRequest: WaitRequest = {
       slotId,
       checkIndex,
       requiredCount: request.n,
       timeoutMs: request.timeoutMs,
     };
-    const outcome = await deps.waits.register(waitRequest, () => accumulator.count());
-    return mapWaitOutcome(outcome);
+    const handle = deps.waits.registerWithHandle(waitRequest, () => accumulator.count());
+    return {
+      waitId: handle.waitId,
+      result: handle.result.then(mapWaitOutcome),
+    };
   };
 
-  return { count, read, wait };
+  const wait = (
+    slotId: SlotId,
+    checkIndex: number,
+    request: { readonly n: number; readonly timeoutMs: number },
+  ) => waitWithHandle(slotId, checkIndex, request).result;
+
+  return { count, read, wait, waitWithHandle };
 }
 
 function isValidCheckIndex(checkIndex: number): boolean {
