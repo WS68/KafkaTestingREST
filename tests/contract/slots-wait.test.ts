@@ -14,7 +14,7 @@ import type { WaitRegistry } from '../../src/application/waiting/wait-registry.j
 import { createWaitRegistry } from '../../src/application/waiting/wait-registry.js';
 import type { WaitOutcome } from '../../src/domain/wait.js';
 import { createSlotRegistry } from '../../src/domain/slots/slot-registry.js';
-import { createApp } from '../../src/main.js';
+import { createApp } from '../../src/http/create-app.js';
 import { ManualClock } from '../support/manual-clock.js';
 
 const logger: Logger = {

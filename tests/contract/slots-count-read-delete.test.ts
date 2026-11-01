@@ -6,7 +6,7 @@ import type { WaitResult } from '../../src/application/results/waiting.js';
 import type { PublishingService } from '../../src/application/publishing/publishing-service.js';
 import type { SlotDeletionService } from '../../src/application/slots/slot-deletion.js';
 import type { SlotQueryService } from '../../src/application/slots/slot-queries.js';
-import { createApp } from '../../src/main.js';
+import { createApp } from '../../src/http/create-app.js';
 
 const logger: Logger = {
   log: () => undefined,

@@ -1,17 +1,27 @@
 import { Kafka } from 'kafkajs';
-import type { KafkaConsumerFactory, KafkaGroupAdmin } from '../../application/ports/kafka-consumer.js';
+import type {
+  KafkaConsumerFactory,
+  KafkaGroupAdmin,
+} from '../../application/ports/kafka-consumer.js';
 import type { KafkaPublisher } from '../../application/ports/kafka-publisher.js';
+import type { DrainableKafkaPublisher } from './native-publisher.js';
 import type { Logger } from '../../application/ports/logger.js';
 import type { PreparedConfig } from '../config/prepare-config.js';
 import { createNativeConsumerFactory } from './native-consumer.js';
 import { createNativeGroupAdmin } from './native-group-admin.js';
 import { createNativeKafkaPublisher } from './native-publisher.js';
 import { createNativeProducer } from './kafka-producer-lifecycle.js';
+import {
+  createKafkaJsAdminAdapter,
+  createKafkaJsAdminClientAdapter,
+  createKafkaJsConsumerAdapter,
+  createKafkaJsProducerAdapter,
+} from './kafkajs-adapters.js';
 
 export interface KafkaPorts {
-  readonly publisher: KafkaPublisher;
+  readonly publisher: KafkaPublisher & DrainableKafkaPublisher;
   readonly consumerFactory: KafkaConsumerFactory;
-  readonly groupAdmin: KafkaGroupAdmin;
+  readonly groupAdmin: KafkaGroupAdmin & { readonly close: () => Promise<void> };
   readonly producer?: { readonly close: () => Promise<void> };
 }
 
@@ -20,16 +30,16 @@ export function createKafkaPorts(config: PreparedConfig, logger: Logger): KafkaP
   const kafka = new Kafka({ brokers: [`${config.cluster.host}:${config.cluster.port}`] });
   const nativeProducer = createNativeProducer({
     cluster: config.cluster,
-    createProducer: () => kafka.producer(),
+    createProducer: () => createKafkaJsProducerAdapter(kafka.producer()),
   });
   const publisher = createNativeKafkaPublisher({ producer: nativeProducer, logger });
   const consumerFactory = createNativeConsumerFactory({
-    createConsumer: (groupId) => kafka.consumer({ groupId }),
-    createAdmin: () => kafka.admin(),
+    createConsumer: (groupId) => createKafkaJsConsumerAdapter(kafka.consumer({ groupId })),
+    createAdmin: () => createKafkaJsAdminAdapter(kafka.admin()),
     logger,
   });
   const groupAdmin = createNativeGroupAdmin({
-    createAdminClient: () => kafka.admin(),
+    createAdminClient: () => createKafkaJsAdminClientAdapter(kafka.admin()),
     logger,
   });
 

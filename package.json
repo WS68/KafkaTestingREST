@@ -7,15 +7,18 @@
   "engines": {
     "node": ">=22"
   },
-  "main": "dist/main.js",
+  "main": "dist/start.js",
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "node scripts/run-vitest.mjs run",
     "test:integration": "node scripts/run-vitest.mjs run --config vitest.integration.config.ts",
+    "verify": "npm run typecheck && npm run format:check && npm test && npm run build && npm audit --audit-level=high",
+    "verify:integration": "npm run test:integration",
+    "audit:ci": "npm audit --audit-level=high",
     "format": "prettier --write --no-error-on-unmatched-pattern \"src/**/*.ts\" \"tests/**/*.ts\"",
     "format:check": "prettier --check --no-error-on-unmatched-pattern \"src/**/*.ts\" \"tests/**/*.ts\"",
-    "start": "node dist/main.js"
+    "start": "node dist/start.js"
   },
   "dependencies": {
     "@fastify/swagger": "9.9.2",

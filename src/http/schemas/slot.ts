@@ -73,8 +73,8 @@ export const waitQuerySchema = {
   type: 'object',
   additionalProperties: false,
   properties: {
-    n: { type: 'integer', minimum: 1 },
-    timeoutMs: { type: 'integer', minimum: 1 },
+    n: { type: 'string' },
+    timeoutMs: { type: 'string' },
   },
 } as const satisfies FastifySchema['querystring'];
 

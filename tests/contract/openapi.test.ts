@@ -12,7 +12,7 @@ import type { PublishingService } from '../../src/application/publishing/publish
 import type { SlotQueryService, SlotWaitHandle } from '../../src/application/slots/slot-queries.js';
 import type { SlotDeletionService } from '../../src/application/slots/slot-deletion.js';
 import type { SlotRegistrationService } from '../../src/application/slots/slot-registration.js';
-import { createApp } from '../../src/main.js';
+import { createApp } from '../../src/http/create-app.js';
 
 type OpenApiSchema = {
   readonly type?: string;

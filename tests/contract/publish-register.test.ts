@@ -6,7 +6,7 @@ import type { SlotRegistrationResult } from '../../src/application/results/slot.
 import type { PublishingService } from '../../src/application/publishing/publishing-service.js';
 import type { SlotRegistrationService } from '../../src/application/slots/slot-registration.js';
 import type { RecordDto } from '../../src/application/publishing/publication-input.js';
-import { createApp, type AppDependencies } from '../../src/main.js';
+import { createApp, type AppDependencies } from '../../src/http/create-app.js';
 
 // This contract test replaces application ports directly; it deliberately does not import KafkaJS or instantiate Kafka clients.
 const logger: Logger = {
