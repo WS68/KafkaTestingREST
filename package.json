@@ -1,0 +1,39 @@
+{
+  "name": "kafka-testing-rest",
+  "version": "0.0.0",
+  "private": true,
+  "description": "HTTP-сервис для публикации и наблюдения записей Kafka",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "main": "dist/start.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "node scripts/run-vitest.mjs run",
+    "test:integration": "node scripts/run-vitest.mjs run --config vitest.integration.config.ts",
+    "verify": "npm run typecheck && npm run format:check && npm test && npm run build && npm audit --audit-level=high",
+    "verify:integration": "npm run test:integration",
+    "audit:ci": "npm audit --audit-level=high",
+    "format": "prettier --write --no-error-on-unmatched-pattern \"src/**/*.ts\" \"tests/**/*.ts\"",
+    "format:check": "prettier --check --no-error-on-unmatched-pattern \"src/**/*.ts\" \"tests/**/*.ts\"",
+    "start": "node dist/start.js"
+  },
+  "dependencies": {
+    "@fastify/swagger": "9.9.2",
+    "@fastify/swagger-ui": "6.1.2",
+    "fastify": "5.12.7",
+    "kafkajs": "^2.2.4"
+  },
+  "overrides": {
+    "glob": "14.0.3",
+    "minimatch": "11.0.3"
+  },
+  "devDependencies": {
+    "@types/node": "22.20.5",
+    "prettier": "3.9.10",
+    "typescript": "5.9.3",
+    "vitest": "4.1.12"
+  }
+}
