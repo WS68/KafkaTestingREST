@@ -13,6 +13,8 @@ const checkSchema = {
         properties: {
           name: { type: 'string' },
           value: { type: 'string' },
+          operation: { type: 'string', enum: ['EQUALS', 'CONTAINS'] },
+          ignoreCase: { type: 'boolean' },
         },
       },
     },
@@ -25,6 +27,8 @@ const checkSchema = {
         properties: {
           jsonPath: { type: 'string', minLength: 1 },
           value: { type: 'string' },
+          operation: { type: 'string', enum: ['EQUALS', 'CONTAINS'] },
+          ignoreCase: { type: 'boolean' },
         },
       },
     },

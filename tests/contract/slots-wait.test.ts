@@ -1,5 +1,5 @@
 import { request as httpRequest, type ClientRequest } from 'node:http';
-import { afterEach, expect, test } from 'vitest';
+import { afterEach, beforeAll, expect, test } from 'vitest';
 import type { Logger } from '../../src/application/ports/logger.js';
 import type { PublishingService } from '../../src/application/publishing/publishing-service.js';
 import type { CountResult } from '../../src/application/results/slot.js';
@@ -26,6 +26,20 @@ const logger: Logger = {
 };
 const apps: ReturnType<typeof createApp>[] = [];
 const waitUrl = '/api/v1/slots/x/checks/0/wait';
+
+// Первое `ready()` в воркере вычисляет граф модулей Fastify, @fastify/swagger и
+// @fastify/swagger-ui и регистрирует плагины. На холодном кеше и при конкуренции
+// за ЦП эта разовая работа занимает больше бюджета отдельного теста (5000 мс), но
+// укладывается в бюджет хука (10000 мс). Прогреваем граф хуком, чтобы цена первого
+// `ready()` не попадала в первый тест файла.
+beforeAll(async () => {
+  const warmup = createApp({
+    publishing: { publish: async () => ({ kind: 'published', ack: 'broker' }) },
+    logger,
+  });
+  await warmup.ready();
+  await warmup.close();
+});
 
 afterEach(async () => {
   await Promise.all(apps.splice(0).map((app) => app.close()));
