@@ -199,4 +199,3 @@ test('header names remain case-sensitive even when value comparison ignores case
     matchesHeaders(record([header('Tag', 'MIXED')]), [condition('tag', 'mixed', 'EQUALS', true)]),
   ).toBe(false);
 });
-
