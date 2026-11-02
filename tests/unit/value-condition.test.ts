@@ -18,10 +18,15 @@ function record(value?: string | Uint8Array): SourceRecord {
   };
 }
 
-function condition(jsonPath: string, value: string): CompiledValueCondition {
+function condition(
+  jsonPath: string,
+  value: string,
+  operation: CompiledValueCondition['operation'] = 'EQUALS',
+  ignoreCase = false,
+): CompiledValueCondition {
   const segments = parseJsonPath(jsonPath);
   if (segments === undefined) throw new Error(`Unexpected invalid JSONPath: ${jsonPath}`);
-  return { jsonPath: segments, value };
+  return { jsonPath: segments, value, operation, ignoreCase };
 }
 
 test.each([
@@ -79,6 +84,118 @@ test.each([
   ],
 ] as const)('%s', (_title, json, jsonPath, expected, result) => {
   expect(matchesValueCondition(record(json), condition(jsonPath, expected))).toBe(result);
+});
+
+test('value matching supports contains and Unicode case folding', () => {
+  expect(
+    matchesValueCondition(
+      record('{"x":"A Straße event"}'),
+      condition('$.x', 'STRASSE', 'CONTAINS', true),
+    ),
+  ).toBe(true);
+  expect(matchesValueCondition(record('{"x":"Straße"}'), condition('$.x', 'STRASSE'))).toBe(false);
+});
+
+test('omitted value options default to strict, case-sensitive EQUALS', () => {
+  const defaults = prepareCheck({ values: [{ jsonPath: '$.x', value: 'Ready' }] });
+  const explicit = prepareCheck({
+    values: [{ jsonPath: '$.x', value: 'Ready', operation: 'EQUALS', ignoreCase: false }],
+  });
+
+  expect(defaults).toEqual(explicit);
+  expect(defaults.kind).toBe('ok');
+  if (defaults.kind !== 'ok') return;
+  const compiled = defaults.check.values[0];
+  if (compiled === undefined) throw new Error('Expected a compiled value condition');
+  expect(matchesValueCondition(record('{"x":"Ready"}'), compiled)).toBe(true);
+  expect(matchesValueCondition(record('{"x":"ready"}'), compiled)).toBe(false);
+  expect(matchesValueCondition(record('{"x":"Ready now"}'), compiled)).toBe(false);
+});
+
+test('prepareCheck applies defaults to value conditions', () => {
+  const prepared = prepareCheck({ values: [{ jsonPath: '$.x', value: 'Ready' }] });
+
+  expect(prepared).toEqual({
+    kind: 'ok',
+    check: {
+      headers: [],
+      values: [
+        {
+          jsonPath: [{ kind: 'root' }, { kind: 'property', name: 'x' }],
+          value: 'Ready',
+          operation: 'EQUALS',
+          ignoreCase: false,
+        },
+      ],
+    },
+  });
+});
+
+test.each([
+  ['contains finds a substring', '{"x":"event-ready"}', 'ready', 'CONTAINS', false, true],
+  [
+    'contains rejects an absent substring',
+    '{"x":"event-pending"}',
+    'ready',
+    'CONTAINS',
+    false,
+    false,
+  ],
+  ['ignoreCase equals matches', '{"x":"READY"}', 'ready', 'EQUALS', true, true],
+  ['ignoreCase contains matches', '{"x":"event-READY"}', 'ready', 'CONTAINS', true, true],
+  [
+    'case-sensitive equals rejects case difference',
+    '{"x":"READY"}',
+    'ready',
+    'EQUALS',
+    false,
+    false,
+  ],
+  [
+    'case-sensitive contains rejects case difference',
+    '{"x":"event-READY"}',
+    'ready',
+    'CONTAINS',
+    false,
+    false,
+  ],
+] as const)('%s', (_title, json, expected, operation, ignoreCase, result) => {
+  expect(
+    matchesValueCondition(record(json), condition('$.x', expected, operation, ignoreCase)),
+  ).toBe(result);
+});
+
+test.each([
+  ['sharp s expands to SS', '{"x":"Straße"}', 'STRASSE', true],
+  ['medial and final Greek sigma fold together', '{"x":"οσς"}', 'ΟΣΣ', true],
+  ['Turkish dotted I folds to i plus dot', '{"x":"İ"}', 'i\u0307', true],
+  ['Turkish dotless i remains distinct from i', '{"x":"ı"}', 'i', false],
+  ['ligature expands to FF', '{"x":"ﬀ"}', 'FF', true],
+] as const)('%s', (_title, json, expected, result) => {
+  expect(matchesValueCondition(record(json), condition('$.x', expected, 'EQUALS', true))).toBe(
+    result,
+  );
+});
+
+test('case folding does not normalize NFC and NFD forms', () => {
+  expect(
+    matchesValueCondition(record('{"x":"é"}'), condition('$.x', 'e\u0301', 'EQUALS', true)),
+  ).toBe(false);
+});
+
+test('a matching node among several JSONPath results is sufficient', () => {
+  expect(
+    matchesValueCondition(
+      record('{"items":[{"name":"other"},{"name":"TARGET"}]}'),
+      condition('$.items[*].name', 'target'),
+    ),
+  ).toBe(false);
+  expect(
+    matchesValueCondition(
+      record('{"items":[{"name":"other"},{"name":"TARGET"}]}'),
+      condition('$.items[*].name', 'target', 'EQUALS', true),
+    ),
+  ).toBe(true);
 });
 
 test('nodeToString uses the same JSON serialization rules', () => {

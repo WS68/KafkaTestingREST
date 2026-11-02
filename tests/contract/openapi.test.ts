@@ -18,6 +18,7 @@ type OpenApiSchema = {
   readonly type?: string;
   readonly description?: string;
   readonly required?: readonly string[];
+  readonly enum?: readonly string[];
   readonly additionalProperties?: boolean;
   readonly properties?: Readonly<Record<string, OpenApiSchema>>;
   readonly items?: OpenApiSchema;
@@ -266,6 +267,40 @@ describe('OpenAPI contract', () => {
         expect(parameter).not.toHaveProperty('default');
         expect(parameter.schema).not.toHaveProperty('default');
       }
+    }
+  });
+
+  test('publishes registration condition fields with their exact OpenAPI constraints', () => {
+    const register = operation(paths.register, 'post');
+    const requestSchema = register.requestBody?.content?.['application/json']?.schema;
+    expect(requestSchema).toBeDefined();
+
+    const checksSchema = requestSchema?.properties?.['checks'];
+    expect(checksSchema?.type).toBe('array');
+    const checkSchema = checksSchema?.items;
+    expect(checkSchema?.type).toBe('object');
+
+    const headersSchema = checkSchema?.properties?.['headers'];
+    const valuesSchema = checkSchema?.properties?.['values'];
+    expect(headersSchema?.type).toBe('array');
+    expect(valuesSchema?.type).toBe('array');
+
+    const headersItem = headersSchema?.items;
+    const valuesItem = valuesSchema?.items;
+    expect(headersItem?.required).toEqual(['name', 'value']);
+    expect(valuesItem?.required).toEqual(['jsonPath', 'value']);
+
+    for (const item of [headersItem, valuesItem]) {
+      const operationSchema = item?.properties?.['operation'];
+      const ignoreCaseSchema = item?.properties?.['ignoreCase'];
+
+      expect(operationSchema?.type).toBe('string');
+      expect(operationSchema?.enum).toEqual(['EQUALS', 'CONTAINS']);
+      expect(ignoreCaseSchema?.type).toBe('boolean');
+      expect(item?.required ?? []).not.toContain('operation');
+      expect(item?.required ?? []).not.toContain('ignoreCase');
+      expect(operationSchema).not.toHaveProperty('default');
+      expect(ignoreCaseSchema).not.toHaveProperty('default');
     }
   });
 

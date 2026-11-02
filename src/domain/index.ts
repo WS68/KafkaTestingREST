@@ -1,4 +1,9 @@
-export type { CompiledCheck, CompiledHeaderCondition, CompiledValueCondition } from './check.js';
+export type {
+  CheckOperation,
+  CompiledCheck,
+  CompiledHeaderCondition,
+  CompiledValueCondition,
+} from './check.js';
 export { matchesCheck, prepareCheck } from './checking/index.js';
 export type { CheckAccumulator } from './accumulator.js';
 export { cloneSourceRecord, createCheckAccumulator } from './accumulation/index.js';

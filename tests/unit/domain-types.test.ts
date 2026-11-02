@@ -20,11 +20,13 @@ const source: SourceRecord = {
 };
 
 const check: CompiledCheck = {
-  headers: [{ name: 'correlationId', value: 'corr-123' }],
+  headers: [{ name: 'correlationId', value: 'corr-123', operation: 'EQUALS', ignoreCase: false }],
   values: [
     {
       jsonPath: [{ kind: 'root' }, { kind: 'property', name: 'status' }],
       value: 'COMPLETED',
+      operation: 'EQUALS',
+      ignoreCase: false,
     },
   ],
 };

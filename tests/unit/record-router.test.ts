@@ -124,7 +124,10 @@ test('continues other checks when one prepared condition cannot match malformed 
   if (path === undefined) throw new Error('Expected a valid prepared path');
   const registry = createSlotRegistry();
   const registered = slot(registry, 'invalid-condition', 't1', [
-    { headers: [], values: [{ jsonPath: path, value: 'match' }] },
+    {
+      headers: [],
+      values: [{ jsonPath: path, value: 'match', operation: 'EQUALS', ignoreCase: false }],
+    },
     check(),
   ]);
   const router = createRecordRouter({ registry, waits: createWaits() });

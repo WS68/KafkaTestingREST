@@ -6,5 +6,6 @@ export { matchesHeaders } from './headers.js';
 export { parseJsonPath } from './json-path.js';
 export type { JsonPathSegment } from './json-path.js';
 export { selectNodes } from './json-path-eval.js';
+export { matchesStringCondition } from './string-condition.js';
 export { nodeToString } from './value-condition.js';
 export { matchesValueCondition } from './value-check.js';

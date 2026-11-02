@@ -1,4 +1,4 @@
-import { afterEach, expect, test } from 'vitest';
+import { afterEach, beforeAll, expect, test } from 'vitest';
 import type { InjectOptions, InjectPayload } from 'light-my-request';
 import type { Logger } from '../../src/application/ports/logger.js';
 import type { PublishResult } from '../../src/application/results/publishing.js';
@@ -6,6 +6,9 @@ import type { SlotRegistrationResult } from '../../src/application/results/slot.
 import type { PublishingService } from '../../src/application/publishing/publishing-service.js';
 import type { SlotRegistrationService } from '../../src/application/slots/slot-registration.js';
 import type { RecordDto } from '../../src/application/publishing/publication-input.js';
+import type { CompiledCheck } from '../../src/domain/check.js';
+import { matchesCheck, prepareCheck } from '../../src/domain/checking/check.js';
+import type { SourceRecord } from '../../src/domain/record.js';
 import { createApp, type AppDependencies } from '../../src/http/create-app.js';
 
 // This contract test replaces application ports directly; it deliberately does not import KafkaJS or instantiate Kafka clients.
@@ -18,6 +21,20 @@ const logger: Logger = {
 };
 
 const apps: ReturnType<typeof createApp>[] = [];
+// Первое `ready()` в воркере вычисляет граф модулей Fastify, @fastify/swagger и
+// @fastify/swagger-ui и регистрирует плагины. На холодном кеше и при конкуренции
+// за ЦП эта разовая работа занимает больше бюджета отдельного теста (5000 мс), но
+// укладывается в бюджет хука (10000 мс). Прогреваем граф хуком, чтобы цена первого
+// `ready()` не попадала в первый тест файла.
+beforeAll(async () => {
+  const warmup = createApp({
+    publishing: { publish: async () => ({ kind: 'published', ack: 'broker' }) },
+    logger,
+  });
+  await warmup.ready();
+  await warmup.close();
+});
+
 afterEach(async () => {
   await Promise.all(apps.splice(0).map((app) => app.close()));
 });
@@ -51,9 +68,49 @@ function slotsApp(result: SlotRegistrationResult) {
   return { app, calls };
 }
 
+function preparedSlotsApp(result: SlotRegistrationResult) {
+  const calls: Parameters<SlotRegistrationService['register']>[0][] = [];
+  const compiled: CompiledCheck[][] = [];
+  const slots: SlotRegistrationService = {
+    async register(input) {
+      calls.push(input);
+      const preparedChecks: CompiledCheck[] = [];
+      for (const checkInput of input.checks) {
+        const prepared = prepareCheck(checkInput);
+        if (prepared.kind !== 'ok') return { kind: 'invalid-request' };
+        preparedChecks.push(prepared.check);
+      }
+      compiled.push(preparedChecks);
+      return result;
+    },
+  };
+  const publishing: PublishingService = {
+    publish: async () => ({ kind: 'published', ack: 'broker' }),
+  };
+  const app = createApp({ publishing, slots, logger });
+  apps.push(app);
+  return { app, calls, compiled };
+}
+
 async function inject(app: ReturnType<typeof createApp>, options: string | InjectOptions) {
   await app.ready();
   return app.inject(options);
+}
+
+const encoder = new TextEncoder();
+
+function sourceRecord(
+  headers: readonly { name: string; value: string }[],
+  value: string,
+): SourceRecord {
+  return {
+    headers: headers.map((header) => ({
+      name: encoder.encode(header.name),
+      value: encoder.encode(header.value),
+    })),
+    key: undefined,
+    value: encoder.encode(value),
+  };
 }
 
 function publication(body: InjectPayload = { value: { type: 'STRING', data: 'ok' } }) {
@@ -193,6 +250,13 @@ test.each([
       checks: [{ headers: [{ name: 'x', value: 1 }] }],
     },
   },
+  {
+    label: 'unsupported condition operation',
+    body: {
+      topic: 'orders.results',
+      checks: [{ values: [{ jsonPath: '$.status', value: 'ready', operation: 'MATCHES' }] }],
+    },
+  },
 ])('rejects registration schema error: $label without calling the service', async ({ body }) => {
   const { app, calls } = slotsApp({ kind: 'registered', slotId: 'slot-1', checkCount: 1 });
   const response = await inject(app, { method: 'POST', url: '/api/v1/slots', payload: body });
@@ -223,6 +287,76 @@ test('passes autoDeleteSeconds when provided and permits an empty check', async 
   });
   expect(response.statusCode).toBe(201);
   expect(calls[0]).toEqual({ topic: 'orders.results', checks: [{}], autoDeleteSeconds: 120 });
+});
+
+test('passes operation and ignoreCase from HTTP registration into prepared domain conditions', async () => {
+  const { app, compiled } = preparedSlotsApp({
+    kind: 'registered',
+    slotId: 'slot-1',
+    checkCount: 1,
+  });
+  const response = await inject(app, {
+    method: 'POST',
+    url: '/api/v1/slots',
+    payload: {
+      topic: 'orders.results',
+      checks: [
+        {
+          headers: [{ name: 'x-mode', value: 'ready', operation: 'CONTAINS', ignoreCase: true }],
+          values: [
+            { jsonPath: '$.status', value: 'ready', operation: 'CONTAINS', ignoreCase: true },
+          ],
+        },
+      ],
+    },
+  });
+
+  expect(response.statusCode).toBe(201);
+  const check = compiled[0]?.[0];
+  expect(check).toEqual({
+    headers: [{ name: 'x-mode', value: 'ready', operation: 'CONTAINS', ignoreCase: true }],
+    values: [
+      {
+        jsonPath: [{ kind: 'root' }, { kind: 'property', name: 'status' }],
+        value: 'ready',
+        operation: 'CONTAINS',
+        ignoreCase: true,
+      },
+    ],
+  });
+  if (check === undefined) return;
+  expect(
+    matchesCheck(
+      sourceRecord([{ name: 'x-mode', value: 'prefix-READY-suffix' }], '{"status":"STATE-READY"}'),
+      check,
+    ),
+  ).toBe(true);
+});
+
+test('keeps strict case-sensitive equality for a registration without new condition fields', async () => {
+  const { app, calls, compiled } = preparedSlotsApp({
+    kind: 'registered',
+    slotId: 'slot-1',
+    checkCount: 1,
+  });
+  const body = {
+    topic: 'orders.results',
+    checks: [{ values: [{ jsonPath: '$.status', value: 'Ready' }] }],
+  };
+  const response = await inject(app, { method: 'POST', url: '/api/v1/slots', payload: body });
+
+  expect(response.statusCode).toBe(201);
+  expect(calls[0]).toEqual(body);
+  const check = compiled[0]?.[0];
+  expect(check?.values[0]).toEqual({
+    jsonPath: [{ kind: 'root' }, { kind: 'property', name: 'status' }],
+    value: 'Ready',
+    operation: 'EQUALS',
+    ignoreCase: false,
+  });
+  if (check === undefined) return;
+  expect(matchesCheck(sourceRecord([], '{"status":"ready"}'), check)).toBe(false);
+  expect(matchesCheck(sourceRecord([], '{"status":"Ready"}'), check)).toBe(true);
 });
 
 // Compile-time architecture guard: controllers are wired to application services, not internal registries.

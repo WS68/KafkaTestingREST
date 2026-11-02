@@ -1,6 +1,8 @@
 import { expect, test } from 'vitest';
 import type {
   EmptyResponseDto,
+  ExpectedHeaderDto,
+  ExpectedValueDto,
   ReadRecordDto,
   RecordDto,
   SlotRegistrationRequestDto,
@@ -33,6 +35,19 @@ const registration: SlotRegistrationRequestDto = {
 
 const empty: EmptyResponseDto = {};
 
+const configuredHeader: ExpectedHeaderDto = {
+  name: 'correlationId',
+  value: 'corr-123',
+  operation: 'CONTAINS',
+  ignoreCase: true,
+};
+const configuredValue: ExpectedValueDto = {
+  jsonPath: '$.status',
+  value: 'completed',
+  operation: 'EQUALS',
+  ignoreCase: false,
+};
+
 function acceptsPublication(_: RecordDto): void {}
 
 // @ts-expect-error ReadRecordDto is a read representation, not a publication request.
@@ -58,5 +73,7 @@ test('transport DTOs preserve publication and read model boundaries', () => {
   expect(publication.value.type).toBe('JSON');
   expect(read.value.type).toBe('JSON');
   expect(registration.checks).toHaveLength(1);
+  expect(configuredHeader.operation).toBe('CONTAINS');
+  expect(configuredValue.operation).toBe('EQUALS');
   expect(empty).toEqual({});
 });

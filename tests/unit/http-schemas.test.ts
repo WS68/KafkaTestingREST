@@ -65,6 +65,70 @@ describe('HTTP-схемы', () => {
     ).toBe(false);
   });
 
+  it('проверяет operation, ignoreCase и строгую структуру элементов условий', () => {
+    expect(
+      valid(slotRegistrationSchema, {
+        topic: 'events',
+        checks: [
+          {
+            headers: [
+              { name: 'x-equals', value: 'one', operation: 'EQUALS', ignoreCase: true },
+              { name: 'x-contains', value: 'two', operation: 'CONTAINS', ignoreCase: false },
+            ],
+            values: [
+              { jsonPath: '$.equals', value: 'one', operation: 'EQUALS', ignoreCase: true },
+              { jsonPath: '$.contains', value: 'two', operation: 'CONTAINS', ignoreCase: false },
+            ],
+          },
+        ],
+      }),
+    ).toBe(true);
+    expect(
+      valid(slotRegistrationSchema, {
+        topic: 'events',
+        checks: [{ headers: [{ name: 'x', value: 'one', operation: 'STARTS_WITH' }] }],
+      }),
+    ).toBe(false);
+    expect(
+      valid(slotRegistrationSchema, {
+        topic: 'events',
+        checks: [{ values: [{ jsonPath: '$', value: 'one', operation: 'STARTS_WITH' }] }],
+      }),
+    ).toBe(false);
+    expect(
+      valid(slotRegistrationSchema, {
+        topic: 'events',
+        checks: [{ headers: [{ name: 'x', value: 'one', ignoreCase: 'true' }] }],
+      }),
+    ).toBe(false);
+    expect(
+      valid(slotRegistrationSchema, {
+        topic: 'events',
+        checks: [{ values: [{ jsonPath: '$', value: 'one', ignoreCase: 1 }] }],
+      }),
+    ).toBe(false);
+    expect(
+      valid(slotRegistrationSchema, {
+        topic: 'events',
+        checks: [
+          { headers: [{ name: 'x', value: 'one' }], values: [{ jsonPath: '$', value: 'one' }] },
+        ],
+      }),
+    ).toBe(true);
+    expect(
+      valid(slotRegistrationSchema, {
+        topic: 'events',
+        checks: [{ headers: [{ name: 'x', value: 'one', unexpected: true }] }],
+      }),
+    ).toBe(false);
+    expect(
+      valid(slotRegistrationSchema, {
+        topic: 'events',
+        checks: [{ values: [{ jsonPath: '$', value: 'one', unexpected: true }] }],
+      }),
+    ).toBe(false);
+  });
+
   it('проверяет ошибку API и пустое тело ответа', () => {
     expect(valid(emptyResponseSchema, {})).toBe(true);
     expect(valid(emptyResponseSchema, { extra: 1 })).toBe(false);

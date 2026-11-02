@@ -28,10 +28,18 @@ function record(
 }
 
 function check(
-  headers: CompiledCheck['headers'] = [],
+  headers: readonly { readonly name: string; readonly value: string }[] = [],
   values: CompiledCheck['values'] = [],
 ): CompiledCheck {
-  return { headers, values };
+  return {
+    headers: headers.map(({ name, value }) => ({
+      name,
+      value,
+      operation: 'EQUALS',
+      ignoreCase: false,
+    })),
+    values,
+  };
 }
 
 function prepared(jsonPath: string, value: string): CompiledCheck {
@@ -64,7 +72,7 @@ test('value-only checks ignore headers, including undecodable unrelated headers'
 test('both condition sets are joined with logical AND', () => {
   const expected = {
     ...prepared('$.status', 'ok'),
-    headers: [{ name: 'tag', value: 'a' }],
+    headers: check([{ name: 'tag', value: 'a' }]).headers,
   };
   const source = record([header('tag', 'a')], '{"status":"ok"}');
   expect(matchesCheck(source, expected)).toBe(true);
@@ -91,7 +99,7 @@ test('repeated calls are deterministic and do not mutate input bytes', () => {
   const beforeHeader = Array.from(invalidHeader);
   const expected = {
     ...prepared('$.status', 'ok'),
-    headers: [{ name: 'tag', value: 'a' }],
+    headers: check([{ name: 'tag', value: 'a' }]).headers,
   };
 
   expect(matchesCheck(source, expected)).toBe(true);
@@ -136,6 +144,52 @@ test('prepareCheck returns compiled segments for valid paths', () => {
             { kind: 'property', name: 'name' },
           ],
           value: 'x',
+          operation: 'EQUALS',
+          ignoreCase: false,
+        },
+      ],
+    },
+  });
+});
+
+test('prepareCheck preserves explicitly provided operation and ignoreCase', () => {
+  expect(
+    prepareCheck({
+      headers: [{ name: 'x-test', value: 'value', operation: 'CONTAINS', ignoreCase: true }],
+      values: [{ jsonPath: '$.status', value: 'ready', operation: 'CONTAINS', ignoreCase: true }],
+    }),
+  ).toEqual({
+    kind: 'ok',
+    check: {
+      headers: [{ name: 'x-test', value: 'value', operation: 'CONTAINS', ignoreCase: true }],
+      values: [
+        {
+          jsonPath: [{ kind: 'root' }, { kind: 'property', name: 'status' }],
+          value: 'ready',
+          operation: 'CONTAINS',
+          ignoreCase: true,
+        },
+      ],
+    },
+  });
+});
+
+test('prepareCheck defaults omitted operation and ignoreCase', () => {
+  expect(
+    prepareCheck({
+      headers: [{ name: 'x-test', value: 'value' }],
+      values: [{ jsonPath: '$.status', value: 'ready' }],
+    }),
+  ).toEqual({
+    kind: 'ok',
+    check: {
+      headers: [{ name: 'x-test', value: 'value', operation: 'EQUALS', ignoreCase: false }],
+      values: [
+        {
+          jsonPath: [{ kind: 'root' }, { kind: 'property', name: 'status' }],
+          value: 'ready',
+          operation: 'EQUALS',
+          ignoreCase: false,
         },
       ],
     },
