@@ -304,14 +304,34 @@ describe('OpenAPI contract', () => {
     }
   });
 
-  test('serves the specification and Swagger UI', async () => {
+  test('serves the specification and Swagger UI from their public routes', async () => {
     const specificationResponse = await app.inject({ method: 'GET', url: '/api-docs' });
     expect(specificationResponse.statusCode).toBe(200);
     expect(specificationResponse.headers['content-type']).toContain('json');
+    expect(JSON.parse(specificationResponse.body)).toMatchObject({ openapi: '3.0.3' });
 
     const swaggerResponse = await app.inject({ method: 'GET', url: '/api-docs/swagger-ui' });
     expect([200, 301, 302]).toContain(swaggerResponse.statusCode);
     expect(swaggerResponse.headers['content-type']).toContain('html');
+
+    const initializerResponse = await app.inject({
+      method: 'GET',
+      url: '/api-docs/swagger-ui/static/swagger-initializer.js',
+    });
+    expect(initializerResponse.statusCode).toBe(200);
+    expect(initializerResponse.body).toContain('"url":"/api-docs"');
+
+    const internalJsonResponse = await app.inject({
+      method: 'GET',
+      url: '/api-docs/swagger-ui/json',
+    });
+    expect(internalJsonResponse.statusCode).toBe(404);
+
+    const internalJsonWithQueryResponse = await app.inject({
+      method: 'GET',
+      url: '/api-docs/swagger-ui/json?format=full',
+    });
+    expect(internalJsonWithQueryResponse.statusCode).toBe(404);
   });
 
   test('documents the actual invalid registration response status', async () => {

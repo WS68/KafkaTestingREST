@@ -22,7 +22,15 @@ export const registerOpenApi: FastifyPluginAsync = fp(async (app) => {
   await app.register(swaggerUi, {
     routePrefix: '/api-docs/swagger-ui',
     uiConfig: {
-      url: '/api-docs',
+      urls: [{ name: 'Kafka Testing REST API', url: '/api-docs' }],
+    },
+    uiHooks: {
+      onRequest: async (request, reply) => {
+        if (request.url.split('?')[0] === '/api-docs/swagger-ui/json') {
+          reply.code(404);
+          return reply.send();
+        }
+      },
     },
     transformSpecification: (specification) => specification,
   });
